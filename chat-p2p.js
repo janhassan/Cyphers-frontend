@@ -1,4 +1,5 @@
 const socket = io(window.location.origin);
+const backendURL = "https://ad2cc5b6-aaa5-4113-a048-07589b3b2d41-00-2xs93kcxr2v2s.spock.replit.dev/";
 
 // Configuration
 const CONFIG = {
@@ -39,6 +40,12 @@ const onlineUsersDisplay = document.getElementById('online-users');
 const createLinkBtn = document.getElementById('create-link-btn');
 const addFriendBtn = document.getElementById('add-friend-btn');
 const friendUsernameInput = document.getElementById('friend-username');
+// new tab buttons & panes
+const tabFriends    = document.querySelector('.nav-tab[data-tab="friends"]');
+const tabRequests   = document.querySelector('.nav-tab[data-tab="requests"]');
+const friendsPane   = document.getElementById('friends-tab');
+const requestsPane  = document.getElementById('requests-tab');
+
 
 // Session Management
 function createOrGetSession() {
@@ -351,91 +358,92 @@ function setupEmojiPicker() {
 
 // Friends List Functions
 function updateFriendsList() {
-    const friendsListContainer = document.getElementById('friends-tab');
-    friendsListContainer.innerHTML = '<h2><i class="fas fa-user-friends"></i> Friends</h2>';
+    const friendsContainer = friendsPane;
+    friendsContainer.innerHTML = '';
 
     if (friends.list.length === 0) {
-        friendsListContainer.innerHTML += '<p class="no-friends">No friends yet. Add some friends!</p>';
+        friendsContainer.innerHTML = '<p>No friends yet. Add some friends!</p>';
         return;
     }
 
     friends.list.forEach(friend => {
         const friendItem = document.createElement('div');
         friendItem.className = 'friend-item';
-        
+
         friendItem.innerHTML = `
             <img src="${friend.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(friend.username)}" 
                  class="friend-avatar" alt="${friend.username}">
             <div class="friend-info">
                 <div class="friend-name">${friend.username}</div>
-                <div class="friend-status ${friend.online ? 'online' : 'offline'}">
-                    ${friend.online ? 'Online' : 'Offline'} ${friend.status ? '- ' + friend.status : ''}
-                </div>
+                <div class="friend-status">${friend.status || 'No status'}</div>
             </div>
             <div class="friend-actions">
-                <button class="friend-action-btn chat-with-friend" data-username="${friend.username}">
-                    <i class="fas fa-comment"></i>
+                <button class="friend-action-btn start-chat" title="Chat" data-username="${friend.username}">
+                    <i class="fas fa-comment-alt"></i>
                 </button>
-                <button class="friend-action-btn remove-friend" data-username="${friend.username}">
+                <button class="friend-action-btn remove-friend" 
+                        title="Remove" style="background-color: var(--error-color)" 
+                        data-username="${friend.username}">
                     <i class="fas fa-user-minus"></i>
                 </button>
             </div>
         `;
-        
-        friendsListContainer.appendChild(friendItem);
+
+        friendsContainer.appendChild(friendItem);
     });
 
-    // Add event listeners for friend actions
-    document.querySelectorAll('.chat-with-friend').forEach(btn => {
+    // Event Listeners
+    document.querySelectorAll('.start-chat').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const username = e.currentTarget.getAttribute('data-username');
-            startPrivateChat(username);
+            const user = e.currentTarget.getAttribute('data-username');
+            startPrivateChat(user);
         });
     });
 
     document.querySelectorAll('.remove-friend').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const username = e.currentTarget.getAttribute('data-username');
-            removeFriend(username);
+            const user = e.currentTarget.getAttribute('data-username');
+            removeFriend(user);
         });
     });
 }
+
 
 function updateFriendRequests() {
     const addFriendTab = document.getElementById('add-friend-tab');
     const requestsContainer = addFriendTab.querySelector('.friend-requests') || document.createElement('div');
     requestsContainer.className = 'friend-requests';
-    
+
     if (friends.requests.length === 0) {
         requestsContainer.innerHTML = '<h3>No pending friend requests</h3>';
     } else {
         requestsContainer.innerHTML = '<h3>Friend Requests</h3>';
-        
+
         friends.requests.forEach(request => {
             const requestItem = document.createElement('div');
             requestItem.className = 'friend-item';
-            
+
             requestItem.innerHTML = `
-                <img src="${request.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(request.from)}" 
-                     class="friend-avatar" alt="${request.from}">
+                <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(request)}" 
+                     class="friend-avatar" alt="${request}">
                 <div class="friend-info">
-                    <div class="friend-name">${request.from}</div>
+                    <div class="friend-name">${request}</div>
                     <div class="friend-status">Wants to be your friend</div>
                 </div>
                 <div class="friend-actions">
                     <button class="friend-action-btn accept-request" 
                             style="background-color: var(--success-color)"
-                            data-username="${request.from}">
+                            data-username="${request}">
                         <i class="fas fa-check"></i>
                     </button>
                     <button class="friend-action-btn decline-request" 
                             style="background-color: var(--error-color)"
-                            data-username="${request.from}">
+                            data-username="${request}">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
             `;
-            
+
             requestsContainer.appendChild(requestItem);
         });
 
@@ -459,6 +467,7 @@ function updateFriendRequests() {
         addFriendTab.appendChild(requestsContainer);
     }
 }
+
 
 // Friend Actions
 function addFriend() {
@@ -500,24 +509,31 @@ function addFriend() {
     });
 }
 
-function respondToFriendRequest(username, accept) {
+function respondToFriendRequest(fromUser, accept) {
     socket.emit('respondToFriendRequest', {
-        from: username,
-        to: username,
+        from: fromUser,     // sender of the request
+        to: username,       // current user
         accepted: accept
     }, (response) => {
         if (response.success) {
-            friends.requests = friends.requests.filter(r => r.from !== username);
+            // Remove from request list
+            friends.requests = friends.requests.filter(r => r.from !== fromUser);
             updateFriendRequests();
-            
+
             if (accept) {
-                // Add to friends list if accepted
+                // Add to friends list
                 friends.list.push({
-                    username,
+                    username: fromUser,
                     online: false,
                     status: ''
                 });
                 updateFriendsList();
+
+                // Switch to "Friends" tab after accepting
+                tabFriends.classList.add('active');
+                tabRequests.classList.remove('active');
+                friendsPane.style.display = 'block';
+                requestsPane.style.display = 'none';
             }
         } else {
             alert(response.error || 'Failed to process friend request');
@@ -525,25 +541,31 @@ function respondToFriendRequest(username, accept) {
     });
 }
 
-function removeFriend(username) {
-    if (!confirm(`Are you sure you want to remove ${username} from your friends?`)) {
+
+function removeFriend(friendUsername) {
+    if (!confirm(`Are you sure you want to remove ${friendUsername} from your friends?`)) {
         return;
     }
-    
+
     socket.emit('removeFriend', {
-        username1: username,
-        username2: username
+        username1: username,         // current user
+        username2: friendUsername    // friend to remove
     }, (response) => {
-        if (!response.success) {
+        if (response.success) {
+            friends.list = friends.list.filter(f => f.username !== friendUsername);
+            updateFriendsList();
+        } else {
             alert(response.error || 'Failed to remove friend');
         }
     });
 }
 
-function startPrivateChat(username) {
-    const privateRoom = `private_${[username, username].sort().join('_')}`;
+
+function startPrivateChat(friendUsername) {
+    const privateRoom = `private_${[username, friendUsername].sort().join('_')}`;
     handleRoomSwitch(privateRoom);
 }
+
 
 // Notification System
 function showNotification(message) {
@@ -786,10 +808,12 @@ function setupEventListeners() {
     // Tab Switching
     const navTabs = document.querySelectorAll('.nav-tab');
     const tabsContent = {
-        'rooms': document.getElementById('rooms-tab'),
-        'friends': document.getElementById('friends-tab'),
-        'add-friend': document.getElementById('add-friend-tab')
+          'rooms':      document.getElementById('rooms-tab'),
+          'add-friend': document.getElementById('add-friend-tab'),
+          'friends':    document.getElementById('friends-tab'),
+          'requests':   document.getElementById('requests-tab')
     };
+
 
     navTabs.forEach(tab => {
         tab.addEventListener('click', () => {
@@ -897,7 +921,8 @@ function setupEventListeners() {
 }
 
 // Initialization
-function init() {
+async function init() {
+
     const urlParams = new URLSearchParams(window.location.search);
     const roomParam = urlParams.get('room');
     
@@ -911,17 +936,39 @@ function init() {
     setupSocketListeners();
     setupAIChat();
 
-    // Load initial friends list
-    socket.emit('getFriendsList', username, (response) => {
-        if (response.success) {
-            friends.list = response.friends || [];
-            friends.requests = response.requests || [];
-            friends.pending = response.pending || [];
-            
-            updateFriendsList();
-            updateFriendRequests();
+        // Load initial friends list & requests via REST
+    try {
+      // 1️⃣ Fetch current friends
+      const friendsRes = await fetch(`${backendURL}/api/friends`, {
+        headers: { 
+          'Authorization': `Bearer ${localStorage.getItem('token')}` 
         }
-    });
+      });
+      friends.list = friendsRes.ok ? await friendsRes.json() : [];
+
+      // 2️⃣ Fetch incoming & outgoing requests
+      const reqRes = await fetch(`${backendURL}/api/friends/requests`, {
+        headers: { 
+          'Authorization': `Bearer ${localStorage.getItem('token')}` 
+        }
+      });
+      if (reqRes.ok) {
+        const { incoming, outgoing } = await reqRes.json();
+        friends.requests = incoming.map(r => r.fromUsername);
+        friends.pending  = outgoing.map(r => r.toUsername);
+      } else {
+        friends.requests = [];
+        friends.pending  = [];
+      }
+
+      // 3️⃣ Render the tabs
+      updateFriendsList();
+      updateFriendRequests();
+
+    } catch (err) {
+      console.error('Failed to load friends data', err);
+    }
+
 }
 
 // Start the application

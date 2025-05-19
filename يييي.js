@@ -1,4 +1,5 @@
 const socket = io(window.location.origin);
+const backendURL = "https://ad2cc5b6-aaa5-4113-a048-07589b3b2d41-00-2xs93kcxr2v2s.spock.replit.dev/";
 
 // Configuration
 const CONFIG = {
@@ -417,7 +418,7 @@ async function handleFileUpload(file) {
         const formData = new FormData();
         formData.append('file', file);
         
-        const response = await fetch('/upload', {
+        const response = await fetch(`${backendURL}/upload`, {
             method: 'POST',
             body: formData
         });
