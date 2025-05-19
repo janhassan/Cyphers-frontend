@@ -1,4 +1,7 @@
-const socket = io(window.location.origin);
+const socket = io("https://ad2cc5b6-aaa5-4113-a048-07589b3b2d41-00-2xs93kcxr2v2s.spock.replit.dev", {
+    transports: ['websocket'],
+    secure: true
+});
 
 // Configuration
 const CONFIG = {
@@ -8,6 +11,8 @@ const CONFIG = {
     MAX_MESSAGES_DISPLAY: 600,
     ALLOWED_FILE_TYPES: ['image/', 'video/', 'application/pdf', 'application/msword', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
 };
+
+
 
 // Friends Data Structure
 const friends = {
