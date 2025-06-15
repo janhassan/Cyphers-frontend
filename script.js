@@ -1,4 +1,4 @@
-const backendURL = "https://ad2cc5b6-aaa5-4113-a048-07589b3b2d41-00-2xs93kcxr2v2s.spock.replit.dev/";
+const backendURL = "https://ad2cc5b6-aaa5-4113-a048-07589b3b2d41-00-2xs93kcxr2v2s.spock.replit.dev";
 
 document.getElementById("createWallet").addEventListener("click", async () => {
   const response = await fetch(`${backendURL}/api/wallet/create-wallet`, { method: "POST" });
